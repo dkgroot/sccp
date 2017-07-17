@@ -38,6 +38,12 @@ func (d *Deserializer) ReadUint8() uint8 {
 	return v
 }
 
+func (d *Deserializer) ReadUint16() uint16 {
+	v := binary.LittleEndian.Uint16(d.Buf[d.Off:])
+	d.Off += 2
+	return v
+}
+
 func (d *Deserializer) ReadUint32() uint32 {
 	v := binary.LittleEndian.Uint32(d.Buf[d.Off:])
 	d.Off += 4

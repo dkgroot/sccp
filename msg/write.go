@@ -1,6 +1,7 @@
 package msg
 
 import (
+	"bytes"
 	"errors"
 	"io"
 )
@@ -38,46 +39,47 @@ func (mw *MsgWriter) WriteMsg(m Msg) error {
 }
 
 type MsgReader struct {
-	r   io.Reader
+	r   *bytes.Reader
 	buf [maxBodySize]byte
 }
 
-func NewMsgReader(r io.Reader) *MsgReader {
-	return &MsgReader{r: r}
+func NewMsgReader(r bytes.Reader) *MsgReader {
+	return &MsgReader{r: &r}
 }
 
-func (mr *MsgReader) ReadMsg() (Msg, error) {
-	var m Msg
+func (mr *MsgReader) ReadMsg() (m []Msg, err error) {
+	m = []Msg{}
+	for mr.r.Len() > 0 {
+		// read header
+		n, err := mr.r.Read(mr.buf[:headerSize])
+		if err != nil {
+			return m, err
+		} else if n != headerSize {
+			return m, errors.New("could read header completly")
+		}
 
-	// read header
-	n, err := mr.r.Read(mr.buf[:headerSize])
-	if err != nil {
-		return m, err
-	} else if n != headerSize {
-		return m, errors.New("could read header completly")
+		// deserialize header
+		deserializer := &Deserializer{Buf: mr.buf[:headerSize]}
+		length := deserializer.ReadUint32()
+		deserializer.ReadUint32()
+		msgId := deserializer.ReadUint32()
+
+		bodySize := int(length) - 4
+		if bodySize < 0 || bodySize > maxBodySize {
+			return m, errors.New("invalid message lenght")
+		}
+
+		// read body
+		_, err = mr.r.Read(mr.buf[:bodySize])
+		if err != nil {
+			return m, err
+		}
+
+		// deserialize body
+		deserializer = &Deserializer{Buf: mr.buf[:bodySize]}
+		msg := newFromId(msgId)
+		msg.Deserialize(deserializer)
+		m = append(m, msg)
 	}
-
-	// deserialize header
-	deserializer := &Deserializer{Buf: mr.buf[:headerSize]}
-	length := deserializer.ReadUint32()
-	deserializer.ReadUint32()
-	msgId := deserializer.ReadUint32()
-
-	bodySize := int(length) - 4
-	if bodySize < 0 || bodySize > maxBodySize {
-		return m, errors.New("invalid message lenght")
-	}
-
-	// read body
-	_, err = io.ReadFull(mr.r, mr.buf[:bodySize])
-	if err != nil {
-		return m, err
-	}
-
-	// deserialize body
-	deserializer = &Deserializer{Buf: mr.buf[:bodySize]}
-	m = newFromId(msgId)
-	m.Deserialize(deserializer)
-
 	return m, nil
 }
