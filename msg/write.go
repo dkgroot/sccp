@@ -61,20 +61,26 @@ func (mr *MsgReader) ReadMsg() (m []Msg, err error) {
 		// deserialize header
 		deserializer := &Deserializer{Buf: mr.buf[:headerSize]}
 		length := deserializer.ReadUint32()
-		deserializer.ReadUint32()
+		headerVersion := deserializer.ReadUint32()
+
+		if headerVersion != 22 && headerVersion != 0 {
+			return m, errors.New("invalid header version")
+		}
 		msgId := deserializer.ReadUint32()
 
 		bodySize := int(length) - 4
-		if bodySize < 0 || bodySize > maxBodySize {
+		if bodySize < 0 || bodySize > maxBodySize || bodySize > mr.r.Len() {
+			println(msgId, bodySize)
 			return m, errors.New("invalid message lenght")
 		}
 
-		// read body
-		_, err = mr.r.Read(mr.buf[:bodySize])
-		if err != nil {
-			return m, err
+		if bodySize > 0 {
+			// read body
+			_, err = mr.r.Read(mr.buf[:bodySize])
+			if err != nil {
+				return m, err
+			}
 		}
-
 		// deserialize body
 		deserializer = &Deserializer{Buf: mr.buf[:bodySize]}
 		msg := newFromId(msgId)
