@@ -2,16 +2,37 @@ package msg
 
 const (
 	// Messages sent from client to server
-	KeepAliveMsgId    = 0x00
-	RegisterMsgId     = 0x01
-	KeypadButtonMsgId = 0x03
+	KeepAliveMsgId                    = 0x00
+	RegisterMsgId                     = 0x01
+	KeypadButtonMsgId                 = 0x03
+	OffHookMessageId                  = 0x06
+	OpenReceiveChannelAckMessageId    = 0x22
+	MediaPathEventMessageId           = 0x49
+	SetSpeakerModeMessageId           = 0x88
+	StartMediaTransmitionAckMessageId = 0x154
 
 	// Messages sent from server to client
-	RegisterAckMsgId     = 0x81
-	CapabilitiesReqMsgId = 0x9B
-	RegisterRejMsgId     = 0x9D
-	KeepAliveAckMsgId    = 0x0100
-	ClearNotifyMsgId     = 0x0115
+	StartMediaTransmitionMessageId   = 0x8A
+	StopMediaTransmitionMessageId    = 0x8B
+	RegisterAckMsgId                 = 0x81
+	DefineTimeDateMessageId          = 0x94
+	CapabilitiesReqMsgId             = 0x9B
+	RegisterRejMsgId                 = 0x9D
+	KeepAliveAckMsgId                = 0x0100
+	OpenReceiveChannelMessageId      = 0x0105
+	CloseReceiveChannelMessageId     = 0x0106
+	ConnectionStatisticsReqMessageId = 0x0107
+	SelectSoftKeysMessageId          = 0x0110
+	ClearPromptStatusMessageId       = 0x0113
+	ClearNotifyMsgId                 = 0x0115
+	ActivateCallPlaneMessageId       = 0x0116
+	CallStateMessageId               = 0x0111
+	DisplayPriNotifyV2MessageId      = 0x0144
+	DisplayPromptStatusV2MessageId   = 0x0145
+	CallInfoV2MessageId              = 0x014A
+	StopToneMessageId                = 0x83
+	SetLampMessageId                 = 0x86
+	SetRingerMessageId               = 0x85
 
 	// Device types (used in RegisterMsg)
 	DeviceType7960   = 7
@@ -127,6 +148,96 @@ func init() {
 	)
 }
 
+type StopToneMessage struct {
+	LineInstance  uint32
+	CallReference uint32
+	Tone          uint32
+}
+
+func (m *StopToneMessage) Id() uint32 {
+	return StopToneMessageId
+}
+
+func (m *StopToneMessage) Serialize(s *Serializer) {
+	s.WriteUint32(m.LineInstance)
+	s.WriteUint32(m.CallReference)
+	s.WriteUint32(m.Tone)
+}
+
+func (m *StopToneMessage) Deserialize(d *Deserializer) {
+	m.LineInstance = d.ReadUint32()
+	m.CallReference = d.ReadUint32()
+	m.Tone = d.ReadUint32()
+}
+
+func init() {
+	registerFactory(
+		StopToneMessageId,
+		func() Msg { return &StopToneMessage{} },
+	)
+}
+
+type SelectSoftKeysMessage struct {
+	LineInstance    uint32
+	CallInstance    uint32
+	SoftKeySetIndex uint32
+	ValidKeyMask    [4]byte
+}
+
+func (m *SelectSoftKeysMessage) Id() uint32 {
+	return SelectSoftKeysMessageId
+}
+
+func (m *SelectSoftKeysMessage) Serialize(s *Serializer) {
+	s.WriteUint32(m.LineInstance)
+	s.WriteUint32(m.CallInstance)
+	s.WriteUint32(m.SoftKeySetIndex)
+	s.WriteBytes(m.ValidKeyMask[:])
+}
+
+func (m *SelectSoftKeysMessage) Deserialize(d *Deserializer) {
+	m.LineInstance = d.ReadUint32()
+	m.CallInstance = d.ReadUint32()
+	m.SoftKeySetIndex = d.ReadUint32()
+	d.ReadBytes(m.ValidKeyMask[:])
+}
+
+func init() {
+	registerFactory(
+		SelectSoftKeysMessageId,
+		func() Msg { return &SelectSoftKeysMessage{} },
+	)
+}
+
+type CallStateMessage struct {
+	CallState    uint32
+	LineInstance uint32
+	CallInstance uint32
+}
+
+func (m *CallStateMessage) Id() uint32 {
+	return CallStateMessageId
+}
+
+func (m *CallStateMessage) Serialize(s *Serializer) {
+	s.WriteUint32(m.CallState)
+	s.WriteUint32(m.LineInstance)
+	s.WriteUint32(m.CallInstance)
+}
+
+func (m *CallStateMessage) Deserialize(d *Deserializer) {
+	m.CallState = d.ReadUint32()
+	m.LineInstance = d.ReadUint32()
+	m.CallInstance = d.ReadUint32()
+}
+
+func init() {
+	registerFactory(
+		CallStateMessageId,
+		func() Msg { return &CallStateMessage{} },
+	)
+}
+
 type KeypadButtonMsg struct {
 	Button       uint32
 	LineInstance uint32
@@ -153,6 +264,70 @@ func init() {
 	registerFactory(
 		KeypadButtonMsgId,
 		func() Msg { return &KeypadButtonMsg{} },
+	)
+}
+
+type CallInfoV2Message struct {
+	LineInstance               uint32
+	CallReference              uint32
+	CallType                   uint32
+	OriginalCdpnRedirectReason uint32
+	LastRedirectingReason      uint32
+	CallInstance               uint32
+	CallSecurityStatus         uint32
+	PartyPIRestrictionBits     uint32
+	CallingParty               [10]byte
+	AlternateCallingParty      [10]byte
+	CalledParty                [8]byte
+	OriginalCalledParty        [8]byte
+	LastRedirectingParty       [8]byte
+	CallingPartyName           [14]byte
+	// OriginalCalledPartyName
+	// LastRedirectingPartyName
+}
+
+func (m *CallInfoV2Message) Id() uint32 {
+	return CallInfoV2MessageId
+}
+
+func (m *CallInfoV2Message) Serialize(s *Serializer) {
+	s.WriteUint32(m.LineInstance)
+	s.WriteUint32(m.CallInstance)
+	s.WriteUint32(m.CallType)
+	s.WriteUint32(m.OriginalCdpnRedirectReason)
+	s.WriteUint32(m.LastRedirectingReason)
+	s.WriteUint32(m.CallInstance)
+	s.WriteUint32(m.CallSecurityStatus)
+	s.WriteUint32(m.PartyPIRestrictionBits)
+	s.WriteBytes(m.CallingParty[:])
+	s.WriteBytes(m.AlternateCallingParty[:])
+	s.WriteBytes(m.CalledParty[:])
+	s.WriteBytes(m.OriginalCalledParty[:])
+	s.WriteBytes(m.LastRedirectingParty[:])
+	s.WriteBytes(m.CallingPartyName[:])
+}
+
+func (m *CallInfoV2Message) Deserialize(d *Deserializer) {
+	m.LineInstance = d.ReadUint32()
+	m.CallReference = d.ReadUint32()
+	m.CallType = d.ReadUint32()
+	m.OriginalCdpnRedirectReason = d.ReadUint32()
+	m.LastRedirectingReason = d.ReadUint32()
+	m.CallInstance = d.ReadUint32()
+	m.CallSecurityStatus = d.ReadUint32()
+	m.PartyPIRestrictionBits = d.ReadUint32()
+	d.ReadBytes(m.CallingParty[:])
+	d.ReadBytes(m.AlternateCallingParty[:])
+	d.ReadBytes(m.CalledParty[:])
+	d.ReadBytes(m.OriginalCalledParty[:])
+	d.ReadBytes(m.LastRedirectingParty[:])
+	d.ReadBytes(m.CallingPartyName[:])
+}
+
+func init() {
+	registerFactory(
+		CallInfoV2MessageId,
+		func() Msg { return &CallInfoV2Message{} },
 	)
 }
 
@@ -216,6 +391,29 @@ func init() {
 	registerFactory(
 		KeepAliveAckMsgId,
 		func() Msg { return &KeepAliveAckMsg{} },
+	)
+}
+
+type ActivateCallPlaneMessage struct {
+	LineInstnce uint32
+}
+
+func (m *ActivateCallPlaneMessage) Id() uint32 {
+	return ActivateCallPlaneMessageId
+}
+
+func (m *ActivateCallPlaneMessage) Serialize(s *Serializer) {
+	s.WriteUint32(m.LineInstnce)
+}
+
+func (m *ActivateCallPlaneMessage) Deserialize(d *Deserializer) {
+	m.LineInstnce = d.ReadUint32()
+}
+
+func init() {
+	registerFactory(
+		ActivateCallPlaneMessageId,
+		func() Msg { return &ActivateCallPlaneMessage{} },
 	)
 }
 
